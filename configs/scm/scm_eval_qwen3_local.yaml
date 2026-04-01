@@ -1,0 +1,95 @@
+# Oumi — Evaluación SCM Concept Bottleneck con Qwen3-8B local (via oMLX)
+#
+# PRE-REQUISITO: oMLX corriendo con Qwen3-8B descargado
+#   brew services start omlx
+#   # Descargar desde el panel web: http://localhost:8000/admin
+#   # Modelo: Qwen/Qwen3-8B — quantización 4-bit (~5GB RAM)
+#
+# Uso:
+#   oumi evaluate --config configs/scm_eval_qwen3_local.yaml
+#
+# Nota: la API de oMLX es compatible OpenAI. Solo cambia base_url y model_name.
+# El resto del config es idéntico al de GPT-4o para comparación justa.
+
+model:
+  provider: openai                          # oMLX expone API compatible OpenAI
+  model_name: Qwen/Qwen3-8B               # Nombre exacto tal como aparece en oMLX
+  api_base: "http://localhost:8000/v1"     # oMLX local — no sale de la red
+  api_key: "local"                         # oMLX no requiere key real
+  generation:
+    temperature: 0.0
+    max_new_tokens: 1024
+    response_format:
+      type: json_object
+
+evaluation:
+  tasks:
+    - name: scm_concept_bottleneck
+      dataset:
+        type: json
+        path: data/scm_test_corpus.jsonl   # Mismo corpus que GPT-4o para comparación válida
+        split: test
+      metrics:
+        - name: concept_score_variance
+          type: custom
+          script: scripts/scm_metrics.py
+        - name: confidence_spread_distribution
+          type: custom
+          script: scripts/scm_metrics.py
+        - name: cosine_similarity_vs_gpt4o   # Diferencia vectorial entre Qwen3 y GPT-4o
+          type: custom
+          script: scripts/scm_metrics.py
+      output:
+        path: results/qwen3_local_scores.jsonl
+        format: jsonl
+
+  system_prompt: |
+    You are the SCM Legal Concept Bottleneck Engine.
+    Read the legal text and evaluate the 24 Universal Legal Principles of the Lerer Architecture.
+    Output ONLY valid JSON. Each principle receives a score from 0.0 (irrelevant) to 1.0 (core pillar).
+    Do not explain. Do not add commentary. Output the JSON object only.
+
+  output_schema:
+    type: object
+    required:
+      - summary
+      - principles_scores
+      - confidence_score
+      - schema_version
+    properties:
+      summary:
+        type: string
+      confidence_score:
+        type: number
+        minimum: 0
+        maximum: 1
+      schema_version:
+        type: string
+        default: "2.1.0"
+      principles_scores:
+        type: object
+        required:
+          - Legalidad
+          - Igualdad
+          - DignidadHumana
+          - JerarquiaNormativa
+          - BuenaFe
+          - ConfianzaLegitima
+          - NoDanar
+          - Proporcionalidad
+          - Equidad
+          - AbusoDerecho
+          - Responsabilidad
+          - NoEnriquecimientoSinCausa
+          - Solidaridad
+          - DebidoProceso
+          - PresuncionInocencia
+          - Irretroactividad
+          - InDubioProHomine
+          - AutonomiaVoluntad
+          - PactaSuntServanda
+          - Integridad
+          - TratoDigno
+          - Publicidad
+          - Motivacion
+          - TutelaJudicialEfectiva
