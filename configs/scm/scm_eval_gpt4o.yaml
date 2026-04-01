@@ -1,0 +1,90 @@
+# Oumi — Evaluación SCM Concept Bottleneck con GPT-4o
+# Referencia: paper Zenodo doi:10.5281/zenodo.19373345
+#
+# Uso:
+#   cd ~/Downloads/oumi-local   (el fork adrianlerer/oumi)
+#   oumi evaluate --config configs/scm_eval_gpt4o.yaml
+#
+# Qué hace: corre el pipeline Concept Bottleneck (24 principios)
+# sobre el corpus de test y guarda los vectores de scores.
+# Los resultados se comparan con scm_eval_qwen3.yaml para
+# producir los datos de baseline del paper (Sección 4).
+
+model:
+  provider: openai
+  model_name: gpt-4o
+  api_key: "${OPENAI_API_KEY}"
+  generation:
+    temperature: 0.0        # Determinista para baseline
+    max_new_tokens: 1024
+    response_format:
+      type: json_object     # Forzar JSON — el schema lo valida Zod en el pipeline real
+
+evaluation:
+  tasks:
+    - name: scm_concept_bottleneck
+      dataset:
+        type: json
+        path: data/scm_test_corpus.jsonl     # Ver scripts/prepare_test_corpus.py
+        split: test
+      metrics:
+        - name: concept_score_variance
+          type: custom
+          script: scripts/scm_metrics.py
+        - name: confidence_spread_distribution
+          type: custom
+          script: scripts/scm_metrics.py
+      output:
+        path: results/gpt4o_scores.jsonl
+        format: jsonl
+
+  system_prompt: |
+    You are the SCM Legal Concept Bottleneck Engine.
+    Read the legal text and evaluate the 24 Universal Legal Principles of the Lerer Architecture.
+    Output ONLY valid JSON. Each principle receives a score from 0.0 (irrelevant) to 1.0 (core pillar).
+    Do not explain. Do not add commentary. Output the JSON object only.
+
+  output_schema:
+    type: object
+    required:
+      - summary
+      - principles_scores
+      - confidence_score
+      - schema_version
+    properties:
+      summary:
+        type: string
+      confidence_score:
+        type: number
+        minimum: 0
+        maximum: 1
+      schema_version:
+        type: string
+        default: "2.1.0"
+      principles_scores:
+        type: object
+        required:
+          - Legalidad
+          - Igualdad
+          - DignidadHumana
+          - JerarquiaNormativa
+          - BuenaFe
+          - ConfianzaLegitima
+          - NoDanar
+          - Proporcionalidad
+          - Equidad
+          - AbusoDerecho
+          - Responsabilidad
+          - NoEnriquecimientoSinCausa
+          - Solidaridad
+          - DebidoProceso
+          - PresuncionInocencia
+          - Irretroactividad
+          - InDubioProHomine
+          - AutonomiaVoluntad
+          - PactaSuntServanda
+          - Integridad
+          - TratoDigno
+          - Publicidad
+          - Motivacion
+          - TutelaJudicialEfectiva
